@@ -1,4 +1,3 @@
-
 # Task 1: Provided Codespace Setup (runs in this environment; read secrets from env)
 # Task 2: .txt upload (UI + backend handling)
 # Task 3.1: Ingestion & Chunking
@@ -6,7 +5,6 @@
 # Task 3.3: Conversational Interface (multi-turn chat, clear feedback)
 # Task 4: Support .txt and .pdf
 # Task 5: Multiple documents
-
 
 import os
 import hashlib
@@ -31,8 +29,6 @@ except Exception:
 from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
-
-
 # Task 1: App boot in Codespace (basic Streamlit setup + env-config)
 st.set_page_config(page_title="RAG · INFO5940", page_icon="📚", layout="wide")
 st.title("Retrieval-Augmented Q&A (LangChain + Chroma)")
@@ -55,8 +51,6 @@ if "indexed_docs" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = []
 
-
-
 # Task 4 + Task 2: Loaders for .pdf and .txt/.md (backend handling)
 def save_upload_to_tmp(uploaded_file) -> str:
     """Persist an uploaded file to a temp path (PDF loaders need a file path)."""
@@ -67,18 +61,15 @@ def save_upload_to_tmp(uploaded_file) -> str:
     return path
 
 def load_documents(files) -> List[Document]:
-    
     docs: List[Document] = []
     for f in files:
         name = f.name
         ext = name.split(".")[-1].lower()
-
         # Task 2: .txt backend handling (also support .md)
         if ext in ("txt", "md"):
             text = f.read().decode("utf-8", errors="ignore")
             f.seek(0)
-            docs.append(Document(page_content=text, metadata={"source": name, "page": None}))
-
+            docs.append(Document(page_content=text, metadata={"source": name}))
         # Task 4: .pdf parsing with page metadata for citations
         elif ext == "pdf":
             from langchain_community.document_loaders import PyPDFLoader
@@ -87,14 +78,18 @@ def load_documents(files) -> List[Document]:
             for p in pages:
                 meta = dict(p.metadata or {})
                 meta["source"] = name
-                meta["page"] = meta.get("page", meta.get("page_number"))
+                page = meta.get("page", meta.get("page_number"))
+                if page is not None:
+                    try:
+                        meta["page"] = int(page)
+                    except Exception:
+                        meta["page"] = str(page)
+                else:
+                    meta.pop("page", None)
                 docs.append(Document(page_content=p.page_content, metadata=meta))
-
         else:
             st.warning(f"Unsupported file type: {name}")
     return docs
-
-
 
 # Task 3.1: Chunking strategy (configurable size/overlap; add chunk_idx for traceability)
 def chunk_documents(docs: List[Document], chunk_size: int = 1200, overlap: int = 150) -> List[Document]:
@@ -104,7 +99,6 @@ def chunk_documents(docs: List[Document], chunk_size: int = 1200, overlap: int =
         d.metadata["chunk_idx"] = i
     return chunks
 
-
 # Task 3.2: Vector store wiring (create/get Chroma; index chunks with stable IDs)
 def get_vectorstore(emb) -> Chroma:
     try:
@@ -113,17 +107,31 @@ def get_vectorstore(emb) -> Chroma:
         vs = Chroma(collection_name=COLLECTION, persist_directory=PERSIST_DIR, embedding_function=emb)
     return vs
 
+def sanitize_metadata(meta: dict) -> dict:
+    if not meta:
+        return {}
+    cleaned = {}
+    for k, v in meta.items():
+        if v is None:
+            continue
+        if isinstance(v, (str, int, float, bool)):
+            cleaned[k] = v
+        else:
+            cleaned[k] = str(v)
+    return cleaned
+
 def index_chunks(chunks: List[Document], emb) -> Tuple[Chroma, int]:
     vs = get_vectorstore(emb)
     ids = []
+    cleaned = []
     for d in chunks:
+        d.metadata = sanitize_metadata(d.metadata)
         base = d.page_content + str(d.metadata.get("source")) + str(d.metadata.get("page")) + str(d.metadata.get("chunk_idx"))
         ids.append(hashlib.sha1(base.encode("utf-8")).hexdigest())
-    vs.add_documents(chunks, ids=ids)
+        cleaned.append(d)
+    vs.add_documents(cleaned, ids=ids)
     vs.persist()
     return vs, len(ids)
-
-
 
 # Task 3.2: Retrieval + generation (RAG core)
 def retrieve(vs: Chroma, query: str, k: int = 5) -> List[Document]:
@@ -151,20 +159,14 @@ def format_citations(docs: List[Document]) -> str:
             uniq.append(c); seen.add(c)
     return ", ".join(uniq)
 
-
-
 # Task 2 + Task 4 + Task 5: UI to upload multiple .txt/.md/.pdf and index
 with st.sidebar:
     st.header("Ingestion & Index")
     uploaded_files = st.file_uploader("Upload .txt/.md/.pdf", type=["txt", "md", "pdf"], accept_multiple_files=True)
-
     chunk_size = st.number_input("Chunk size", 200, 4000, 1200, 100)
     overlap = st.number_input("Chunk overlap", 0, 800, 150, 10)
-
     do_index = st.button("Index to Chroma")
     do_clear = st.button("Clear local Chroma")
-
-    
     if do_clear:
         import shutil
         if os.path.isdir(PERSIST_DIR):
@@ -182,19 +184,14 @@ if do_index:
         except Exception as e:
             st.error(f"Failed to init embeddings: {e}")
             st.stop()
-
         docs = load_documents(uploaded_files)
         chunks = chunk_documents(docs, chunk_size=chunk_size, overlap=overlap)
         vs, n = index_chunks(chunks, emb)
-
         for f in uploaded_files:
             st.session_state.indexed_docs.add(f.name)
-
         st.session_state.ready = True
         st.success(f"Indexed {n} chunks")
         st.caption(f"Indexed files: {', '.join(sorted(st.session_state.indexed_docs)) or '(none)'}")
-
-
 
 # Task 3.3: Conversational interface (multi-turn chat + grounded citations)
 st.subheader("Chat")
@@ -212,16 +209,13 @@ if query:
     if not st.session_state.ready:
         st.warning("No documents indexed yet. Upload and index first.")
         st.stop()
-
     try:
         emb = OpenAIEmbeddings(api_key=API_KEY, base_url=BASE_URL, model=EMB_MODEL)
         vs = get_vectorstore(emb)
         retrieved = retrieve(vs, query, k=5)
-
         st.session_state.history.append(("user", query, None))
         with st.chat_message("user"):
             st.markdown(query)
-
         if not retrieved:
             answer = "No sufficient information found in the indexed documents."
             st.session_state.history.append(("assistant", answer, None))
@@ -231,7 +225,6 @@ if query:
             context = "\n\n---\n\n".join([f"[{i+1}] {d.page_content[:1200]}" for i, d in enumerate(retrieved)])
             answer = call_llm(context, query)
             cites = format_citations(retrieved)
-
             st.session_state.history.append(("assistant", answer, cites))
             with st.chat_message("assistant"):
                 st.markdown(answer)
