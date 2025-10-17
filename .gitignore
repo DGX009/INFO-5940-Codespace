@@ -1,0 +1,5 @@
+.chroma/
+uploads_*/
+__pycache__/
+.ipynb_checkpoints/
+.env
