@@ -52,12 +52,11 @@ How to Run (GitHub Codespaces)
 
 Usage Guide
 Sidebar (left):
-  Upload .txt/.md/.pdf (multiple allowed).  
-  Configure Chunk size and Chunk overlap (or keep defaults).  
-  Optional: enable Auto chunking (default ON) to adapt chunk size/overlap by doc length.(this way is recommended)  
-  Click “Index to Chroma” to build the vector index from current uploads.  
-  Click “Clear local Chroma” to delete the CURRENT SESSION index only (for example, when changing embedding model or re-building with different chunk params).  
-  Click “New chat (clear all)” to reset EVERYTHING: chat history, Chroma folders, temporary upload folders, and the file uploader (like a full refresh).  
+1) Upload .txt/.md/.pdf (multiple allowed).
+2) Configure Chunk size and Chunk overlap (or keep defaults). Optional: enable Auto chunking (default ON) to adapt chunk size/overlap by doc length.(this way is recommended)
+3) Click “Index to Chroma” to build the vector index from current uploads.
+4) Click “Clear local Chroma” to delete the CURRENT SESSION index only (for example, when changing embedding model or re-building with different chunk params).
+5) Click “New chat (clear all)” to reset EVERYTHING: chat history, Chroma folders, temporary upload folders, and the file uploader (like a full refresh).
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
