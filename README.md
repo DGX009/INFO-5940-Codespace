@@ -27,10 +27,10 @@ How to Run (GitHub Codespaces)
    pip install -r requirements.txt
 
 3) Set environment variables (do NOT commit keys):
-   export API_KEY="YOUR_KEY"
-   export OPENAI_BASE_URL="https://api.ai.it.cornell.edu"
-   export OPENAI_CHAT_MODEL="openai.gpt-4o-mini"
-   export OPENAI_EMBED_MODEL="openai.text-embedding-3-large"
+   - export API_KEY="YOUR_KEY"
+   - export OPENAI_BASE_URL="https://api.ai.it.cornell.edu"
+   - export OPENAI_CHAT_MODEL="openai.gpt-4o-mini"
+   - export OPENAI_EMBED_MODEL="openai.text-embedding-3-large"
 
    Notes:
    - The Cornell gateway uses prefixed model IDs (e.g., openai.gpt-4o-mini, openai.text-embedding-3-large).
