@@ -9,6 +9,7 @@
 import os
 import hashlib
 import tempfile
+import time
 from typing import List, Tuple
 
 import streamlit as st
@@ -50,6 +51,9 @@ if "indexed_docs" not in st.session_state:
     st.session_state.indexed_docs = set()
 if "history" not in st.session_state:
     st.session_state.history = []
+if "persist_dir" not in st.session_state:
+    st.session_state.persist_dir = os.path.join(PERSIST_DIR, f"session_{int(time.time())}")
+    os.makedirs(st.session_state.persist_dir, exist_ok=True)
 
 # Task 4 + Task 2: Loaders for .pdf and .txt/.md (backend handling)
 def save_upload_to_tmp(uploaded_file) -> str:
@@ -92,19 +96,38 @@ def load_documents(files) -> List[Document]:
     return docs
 
 # Task 3.1: Chunking strategy (configurable size/overlap; add chunk_idx for traceability)
-def chunk_documents(docs: List[Document], chunk_size: int = 1200, overlap: int = 150) -> List[Document]:
-    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=overlap)
-    chunks = splitter.split_documents(docs)
-    for i, d in enumerate(chunks):
+def chunk_documents(docs: List[Document], chunk_size: int = 1200, overlap: int = 150, auto: bool = True) -> List[Document]:
+    out: List[Document] = []
+
+    def choose_params(n_chars: int) -> tuple[int, int]:
+        if n_chars <= 2000:
+            return n_chars, 0
+        if n_chars <= 15000:
+            return max(chunk_size, 1000), max(overlap, 120)
+        if n_chars <= 60000:
+            return max(chunk_size, 1600), max(overlap, 200)
+        return max(chunk_size, 2200), max(overlap, 260)
+
+    for d in docs:
+        if not auto:
+            splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=overlap)
+            pieces = splitter.split_documents([d])
+        else:
+            cs, ov = choose_params(len(d.page_content or ""))
+            splitter = RecursiveCharacterTextSplitter(chunk_size=cs, chunk_overlap=ov)
+            pieces = splitter.split_documents([d])
+        out.extend(pieces)
+
+    for i, d in enumerate(out):
         d.metadata["chunk_idx"] = i
-    return chunks
+    return out
 
 # Task 3.2: Vector store wiring (create/get Chroma; index chunks with stable IDs)
 def get_vectorstore(emb) -> Chroma:
     try:
-        vs = Chroma(collection_name=COLLECTION, embedding_function=emb, persist_directory=PERSIST_DIR)
+        vs = Chroma(collection_name=COLLECTION, embedding_function=emb, persist_directory=st.session_state.persist_dir)
     except TypeError:
-        vs = Chroma(collection_name=COLLECTION, persist_directory=PERSIST_DIR, embedding_function=emb)
+        vs = Chroma(collection_name=COLLECTION, persist_directory=st.session_state.persist_dir, embedding_function=emb)
     return vs
 
 def sanitize_metadata(meta: dict) -> dict:
@@ -165,14 +188,22 @@ with st.sidebar:
     uploaded_files = st.file_uploader("Upload .txt/.md/.pdf", type=["txt", "md", "pdf"], accept_multiple_files=True)
     chunk_size = st.number_input("Chunk size", 200, 4000, 1200, 100)
     overlap = st.number_input("Chunk overlap", 0, 800, 150, 10)
+    auto_chunk = st.checkbox("Auto chunking", value=True)
     do_index = st.button("Index to Chroma")
     do_clear = st.button("Clear local Chroma")
     if do_clear:
         import shutil
-        if os.path.isdir(PERSIST_DIR):
-            shutil.rmtree(PERSIST_DIR)
+        old_dir = st.session_state.get("persist_dir", PERSIST_DIR)
+        if os.path.isdir(old_dir):
+            try:
+                shutil.rmtree(old_dir, ignore_errors=True)
+            except Exception as e:
+                st.warning(f"Partial cleanup: {e}")
+        st.session_state.persist_dir = os.path.join(PERSIST_DIR, f"session_{int(time.time())}")
+        os.makedirs(st.session_state.persist_dir, exist_ok=True)
         st.session_state.indexed_docs = set()
-        st.success("Cleared .chroma/")
+        st.session_state.ready = False
+        st.success("Cleared .chroma/ for this session")
 
 # Execute indexing when user clicks the button (Tasks 3.1 + 3.2 end-to-end)
 if do_index:
@@ -184,8 +215,9 @@ if do_index:
         except Exception as e:
             st.error(f"Failed to init embeddings: {e}")
             st.stop()
+        os.makedirs(st.session_state.persist_dir, exist_ok=True)
         docs = load_documents(uploaded_files)
-        chunks = chunk_documents(docs, chunk_size=chunk_size, overlap=overlap)
+        chunks = chunk_documents(docs, chunk_size=chunk_size, overlap=overlap, auto=auto_chunk)
         vs, n = index_chunks(chunks, emb)
         for f in uploaded_files:
             st.session_state.indexed_docs.add(f.name)
