@@ -26,20 +26,26 @@ try:
 except Exception:
     from langchain_core.documents import Document
 
+
+
+
 # Task 3.2: Vector store + OpenAI adapters
 from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
+
+
+
+
+
 # Task 1: App boot in Codespace (basic Streamlit setup + env-config)
 st.set_page_config(page_title="RAG · INFO5940", page_icon="📚", layout="wide")
 st.title("Retrieval-Augmented Q&A")
-
 # Read secrets from environment; do NOT hardcode keys (security requirement of Task 1)
 API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY")
 BASE_URL = os.getenv("OPENAI_BASE_URL") or os.getenv("BASE_URL") or "https://api.ai.it.cornell.edu"
 CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
 EMB_MODEL = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
-
 # Local persistent vector DB path + collection name (used by Tasks 3.1–3.2)
 PERSIST_DIR = ".chroma"
 COLLECTION = "assignment1"
@@ -58,6 +64,12 @@ if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = f"uploader_{int(time.time())}"
 if "tmp_dirs" not in st.session_state:
     st.session_state.tmp_dirs = []
+
+
+
+
+
+
 
 # Task 4 + Task 2: Loaders for .pdf and .txt/.md (backend handling)
 def save_upload_to_tmp(uploaded_file) -> str:
@@ -98,8 +110,14 @@ def load_documents(files) -> List[Document]:
             st.warning(f"Unsupported file type: {name}")
     return docs
 
+
+
+
+
+
 # Task 3.1: Chunking strategy (configurable size/overlap; add chunk_idx for traceability)
 def chunk_documents(docs: List[Document], chunk_size: int = 1200, overlap: int = 150, auto: bool = True) -> List[Document]:
+
     out: List[Document] = []
 
     def choose_params(n_chars: int) -> tuple[int, int]:
@@ -110,6 +128,7 @@ def chunk_documents(docs: List[Document], chunk_size: int = 1200, overlap: int =
         if n_chars <= 60000:
             return max(chunk_size, 1600), max(overlap, 200)
         return max(chunk_size, 2200), max(overlap, 260)
+
 
     for d in docs:
         if not auto:
@@ -124,6 +143,9 @@ def chunk_documents(docs: List[Document], chunk_size: int = 1200, overlap: int =
     for i, d in enumerate(out):
         d.metadata["chunk_idx"] = i
     return out
+
+
+
 
 # Task 3.2: Vector store wiring (create/get Chroma; index chunks with stable IDs)
 def get_vectorstore(emb) -> Chroma:
@@ -159,6 +181,11 @@ def index_chunks(chunks: List[Document], emb) -> Tuple[Chroma, int]:
     vs.persist()
     return vs, len(ids)
 
+
+
+
+
+
 # Task 3.2: Retrieval + generation (RAG core)
 def retrieve(vs: Chroma, query: str, k: int = 5) -> List[Document]:
     retriever = vs.as_retriever(search_kwargs={"k": k})
@@ -184,6 +211,11 @@ def format_citations(docs: List[Document]) -> str:
         if c not in seen:
             uniq.append(c); seen.add(c)
     return ", ".join(uniq)
+
+
+
+
+
 
 # Task 2 + Task 4 + Task 5: UI to upload multiple .txt/.md/.pdf and index
 with st.sidebar:
@@ -235,6 +267,9 @@ with st.sidebar:
         st.session_state.uploader_key = f"uploader_{int(time.time())}"
         st.rerun()
 
+
+
+
 # Execute indexing when user clicks the button (Tasks 3.1 + 3.2 end-to-end)
 if do_index:
     if not uploaded_files:
@@ -254,6 +289,11 @@ if do_index:
         st.session_state.ready = True
         st.success(f"Indexed {n} chunks")
         st.caption(f"Indexed files: {', '.join(sorted(st.session_state.indexed_docs)) or '(none)'}")
+
+
+
+
+
 
 # Task 3.3: Conversational interface (multi-turn chat + grounded citations)
 st.subheader("Chat")

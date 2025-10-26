@@ -85,21 +85,21 @@ Special Cases
 -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 Design Notes (Mapping to Assignment Tasks)
-- Task 1: Runs in GitHub Codespaces; env variables used (no hardcoded keys); dependencies recorded.
-- Task 2: .txt/.md upload; UTF-8 decoding with errors ignored.
-- Task 3.1: Ingestion & Chunking
+1) Task 1: Runs in GitHub Codespaces; env variables used (no hardcoded keys); dependencies recorded.
+2) Task 2: .txt/.md upload; UTF-8 decoding with errors ignored.
+3) Task 3.1: Ingestion & Chunking
   - RecursiveCharacterTextSplitter with adjustable chunk_size/overlap, plus Auto chunking heuristic by document length.
   - chunk_idx saved in metadata for traceability.
-- Task 3.2: Retrieval-Augmented Generation
+4) Task 3.2: Retrieval-Augmented Generation
   - Chroma persistent vector store per session under .chroma/.
   - Stable SHA1 IDs to avoid duplicate inserts for identical chunks.
   - Similarity retrieval (k=5) → LLM answers. System prompt enforces “answer strictly from context; otherwise say you don’t know”.
-- Task 3.3: Conversational Interface
+5) Task 3.3: Conversational Interface
   - st.chat_input & st.chat_message with multi-turn history in st.session_state.
   - Clear feedback when no index found, when retrieval finds nothing, or when errors occur.
-- Task 4: File Formats
+6) Task 4: File Formats
   - .txt/.md text parsing; .pdf via PyPDFLoader (records page numbers for citations).
-- Task 5: Multiple Documents
+7) Task 5: Multiple Documents
   - Accepts multiple files in one go; retrieval searches across all indexed chunks.
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -124,4 +124,4 @@ Troubleshooting
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-Have fun with the features
+Have fun with the features provided!
