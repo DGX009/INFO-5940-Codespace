@@ -1,14 +1,19 @@
 # ref-log
 
 ## External Sources
-- LangChain docs (retrievers, text splitters)
-- Chroma docs (persistent store)
-- Streamlit docs (file_uploader, chat_input)
-- PyPDF docs
+- LangChain documentation
+- ChromaDB documentation
+- Streamlit documentation
+- PyPDF / PyPDFLoader notes
 
 ## Tools Used
 - GitHub Codespaces
 - pip
+- Python 3.11
+- Streamlit
+- ChromaDB
+- LangChain
+- OpenAI-compatible gateway
 
 ## GenAI Usage
 
