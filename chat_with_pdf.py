@@ -32,7 +32,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 # Task 1: App boot in Codespace (basic Streamlit setup + env-config)
 st.set_page_config(page_title="RAG · INFO5940", page_icon="📚", layout="wide")
-st.title("Retrieval-Augmented Q&A (LangChain + Chroma)")
+st.title("Retrieval-Augmented Q&A")
 
 # Read secrets from environment; do NOT hardcode keys (security requirement of Task 1)
 API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY")
@@ -54,11 +54,16 @@ if "history" not in st.session_state:
 if "persist_dir" not in st.session_state:
     st.session_state.persist_dir = os.path.join(PERSIST_DIR, f"session_{int(time.time())}")
     os.makedirs(st.session_state.persist_dir, exist_ok=True)
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = f"uploader_{int(time.time())}"
+if "tmp_dirs" not in st.session_state:
+    st.session_state.tmp_dirs = []
 
 # Task 4 + Task 2: Loaders for .pdf and .txt/.md (backend handling)
 def save_upload_to_tmp(uploaded_file) -> str:
     """Persist an uploaded file to a temp path (PDF loaders need a file path)."""
     tmpdir = tempfile.mkdtemp(prefix="uploads_")
+    st.session_state.tmp_dirs.append(tmpdir)
     path = os.path.join(tmpdir, uploaded_file.name)
     with open(path, "wb") as f:
         f.write(uploaded_file.read())
@@ -69,12 +74,10 @@ def load_documents(files) -> List[Document]:
     for f in files:
         name = f.name
         ext = name.split(".")[-1].lower()
-        # Task 2: .txt backend handling (also support .md)
         if ext in ("txt", "md"):
             text = f.read().decode("utf-8", errors="ignore")
             f.seek(0)
             docs.append(Document(page_content=text, metadata={"source": name}))
-        # Task 4: .pdf parsing with page metadata for citations
         elif ext == "pdf":
             from langchain_community.document_loaders import PyPDFLoader
             path = save_upload_to_tmp(f)
@@ -185,7 +188,12 @@ def format_citations(docs: List[Document]) -> str:
 # Task 2 + Task 4 + Task 5: UI to upload multiple .txt/.md/.pdf and index
 with st.sidebar:
     st.header("Ingestion & Index")
-    uploaded_files = st.file_uploader("Upload .txt/.md/.pdf", type=["txt", "md", "pdf"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader(
+        "Upload .txt/.md/.pdf",
+        type=["txt", "md", "pdf"],
+        accept_multiple_files=True,
+        key=st.session_state.uploader_key,
+    )
     chunk_size = st.number_input("Chunk size", 200, 4000, 1200, 100)
     overlap = st.number_input("Chunk overlap", 0, 800, 150, 10)
     auto_chunk = st.checkbox("Auto chunking", value=True)
@@ -204,6 +212,28 @@ with st.sidebar:
         st.session_state.indexed_docs = set()
         st.session_state.ready = False
         st.success("Cleared .chroma/ for this session")
+
+    st.divider()
+    if st.button("New chat (clear all)"):
+        import shutil
+        try:
+            if os.path.isdir(PERSIST_DIR):
+                shutil.rmtree(PERSIST_DIR, ignore_errors=True)
+        except Exception as e:
+            st.warning(f"Partial cleanup: {e}")
+        for d in st.session_state.get("tmp_dirs", []):
+            try:
+                shutil.rmtree(d, ignore_errors=True)
+            except Exception:
+                pass
+        st.session_state.tmp_dirs = []
+        st.session_state.history = []
+        st.session_state.indexed_docs = set()
+        st.session_state.ready = False
+        st.session_state.persist_dir = os.path.join(PERSIST_DIR, f"session_{int(time.time())}")
+        os.makedirs(st.session_state.persist_dir, exist_ok=True)
+        st.session_state.uploader_key = f"uploader_{int(time.time())}"
+        st.rerun()
 
 # Execute indexing when user clicks the button (Tasks 3.1 + 3.2 end-to-end)
 if do_index:
